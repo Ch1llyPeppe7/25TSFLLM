@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时序数据预测可视化</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            margin-top: 30px;
+        }
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            margin-top: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .textarea {
+            width: 100%;
+            height: 200px;
+        }
+        .file-input, .textarea-input {
+            margin-bottom: 20px;
+        }
+        .message-box {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .message-box p {
+            padding: 5px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            margin: 3px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1 class="text-center">时序数据预测请求与可视化</h1>
+
+        <!-- 用户输入数据选项 -->
+        <div class="row">
+            <div class="col-md-6 offset-md-3">
+                <form id="data-request-form">
+                    <!-- 文件上传 -->
+                    <div class="form-group file-input">
+                        <label for="data-file">上传 CSV 文件：</label>
+                        <input type="file" class="form-control" id="data-file" accept=".csv">
+                    </div>
+
+                    <!-- 文本框输入 -->
+                    <div class="form-group textarea-input">
+                        <label for="input-text">或直接输入数据（每行一个采样点，格式：时间戳, 数据1, 数据2,...）：</label>
+                        <textarea class="form-control textarea" id="input-text" placeholder="2025-03-01 12:00:00, 23.5, 60, 1013"></textarea>
+                    </div>
+
+                    <!-- 提交数据按钮 -->
+                    <button type="submit" class="btn btn-primary btn-block">提交数据</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 动态选择预测目标通道 -->
+        <div class="row" id="channels-selection-container" style="display: none;">
+            <div class="col-md-6 offset-md-3">
+                <div class="form-group">
+                    <label for="prediction-channels">选择预测目标通道：</label>
+                    <select multiple class="form-control" id="prediction-channels" required>
+                        <!-- 这里会动态填充通道选项 -->
+                    </select>
+                </div>
+                <button id="submit-prediction" class="btn btn-primary btn-block">提交预测请求</button>
+            </div>
+        </div>
+
+        <!-- 预测结果可视化 -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="chart-container">
+                    <canvas id="prediction-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 消息框，用于显示上传或输入的内容 -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="message-box" id="message-box"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 提交数据时的处理
+        document.getElementById("data-request-form").addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            const fileInput = document.getElementById("data-file");
+            const textInput = document.getElementById("input-text").value;
+
+            let userData = null;
+            const formData = new FormData();
+
+            if (fileInput.files.length > 0) {
+                // 文件上传
+                formData.append("file", fileInput.files[0]);
+            } else if (textInput.trim()) {
+                // 文本框输入
+                formData.append("data_text", textInput);
+            } else {
+                alert("请上传CSV文件或输入数据");
+                return;
+            }
+
+            fetch("/process_data", {
+                method: "POST",
+                body: formData
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.channels) {
+                      populateChannelSelection(data.channels);
+                      document.getElementById("channels-selection-container").style.display = "block";
+                  } else {
+                      alert("无法获取通道信息");
+                  }
+              }).catch(err => console.log(err));
+        });
+
+        // 填充通道选择框
+        function populateChannelSelection(channels) {
+            const channelSelect = document.getElementById("prediction-channels");
+            channelSelect.innerHTML = "";  // 清空已有选项
+            channels.forEach(channel => {
+                const option = document.createElement("option");
+                option.value = channel;
+                option.textContent = channel;
+                channelSelect.appendChild(option);
+            });
+        }
+
+        // 提交预测请求
+        document.getElementById("submit-prediction").addEventListener("click", function () {
+            const selectedChannels = Array.from(document.getElementById("prediction-channels").selectedOptions)
+                                           .map(option => option.value);
+
+            if (selectedChannels.length === 0) {
+                alert("请选择至少一个目标通道！");
+                return;
+            }
+
+            const predictionData = {
+                channels: selectedChannels
+            };
+
+            fetch("/predict", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(predictionData)
+            }).then(response => response.json())
+              .then(data => {
+                  // 处理预测结果并显示图表
+                  console.log(data);
+                  // 此处可以使用 Chart.js 来渲染预测结果
+              }).catch(err => console.log(err));
+        });
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
