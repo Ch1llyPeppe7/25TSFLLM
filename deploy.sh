@@ -1,0 +1,1 @@
+python run.py --gpu 0 --eval_model_path ./ModelWeight/unitime.pth --training_list execute_list/train_all.csv --max_token_num 14 --is_training 0 --lm_layer_num 2 --inference_list execute_list/inference_Electricity.csv --mask_rate 0.5 --patch_len 32 
